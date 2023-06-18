@@ -69,6 +69,7 @@ func main() {
     }
 	
 	// Open Menu & Query user for input
+	pterm.DefaultHeader.WithFullWidth(true).Println("Flashterm")
 	appState, _ = pterm.DefaultInteractiveSelect.
 	WithOptions([]string{"record", "test", "quit"}).
 	Show()
