@@ -15,6 +15,7 @@ import (
 type Card struct {
 	Key string
 	Value string
+	Weight float32
 }
 
 func commandInputValidation(input string) (appState string) {
@@ -27,13 +28,35 @@ func commandInputValidation(input string) (appState string) {
 	return ""
 }
 
-func randomPick(vocabulary []Card) (key string, value string) {
-	if len(vocabulary) == 0 {
-		return "", ""
-	}
-
-	keyIndex := rand.Int() % len(vocabulary)
-	return vocabulary[keyIndex].Key, vocabulary[keyIndex].Value
+func WeightedRandom(vocabulary []Card) int {
+    n := len(vocabulary)
+    if n == 0 {
+        return 0
+    }
+    cdf := make([]float32, n)
+    var sum float32 = 0.0
+    for idx, card := range vocabulary {
+        if idx > 0 {
+            cdf[idx] = cdf[idx-1] + card.Weight
+        } else {
+            cdf[idx] = card.Weight
+        }
+        sum += card.Weight
+    }
+    r := rand.Float32() * sum
+    var l, h int = 0, n - 1
+    for l <= h {
+        m := l + (h-l)/2
+        if r <= cdf[m] {
+            if m == 0 || (m > 0 && r > cdf[m-1]) {
+                return m
+            }
+            h = m - 1
+        } else {
+            l = m + 1
+        }
+    }
+    return -1
 }
 
 func main() {
@@ -72,7 +95,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		vocabulary = append(vocabulary, Card{Key: dataLine[0], Value: dataLine[1]})
+		vocabulary = append(vocabulary, Card{Key: dataLine[0], Value: dataLine[1], Weight: 100.0})
     }
 	
 	// Open Menu & Query user for input
@@ -120,7 +143,9 @@ func main() {
 				continue
 			}
 			
-			testedKey, testedValue := randomPick(vocabulary)
+			testedIndex := WeightedRandom(vocabulary)
+			testedKey := vocabulary[testedIndex].Key
+			testedValue := vocabulary[testedIndex].Value
 
 			guessedValue, _ := pterm.DefaultInteractiveTextInput.WithDefaultText(testedKey).Show()
 			updatedState := commandInputValidation(guessedValue)
@@ -132,10 +157,16 @@ func main() {
 			if guessedValue == testedValue {
 				pterm.Success.Printfln(fmt.Sprintf("You guessed correctly! (%s : %s)", testedKey, guessedValue))
 				currentStreak+=1
+				if vocabulary[testedIndex].Weight > 10 {
+					vocabulary[testedIndex].Weight -= 10
+				}
 				pterm.Success.Printfln(fmt.Sprintf("Current streak: %d", currentStreak))
 			} else {
 				pterm.Error.Printfln(fmt.Sprintf("You guessed wrong! :( (%s : %s) should be %s", testedKey, guessedValue, testedValue))
 				currentStreak = 0
+				if vocabulary[testedIndex].Weight < 100 {
+					vocabulary[testedIndex].Weight += 10
+				}
 			}
 		} else if appState == "menu" {
 			appState, _ = pterm.DefaultInteractiveSelect.
