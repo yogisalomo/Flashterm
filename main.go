@@ -12,6 +12,11 @@ import (
 	"github.com/pterm/pterm"
 )
 
+type Card struct {
+	Key string
+	Value string
+}
+
 func commandInputValidation(input string) (appState string) {
 	if input == "/menu" {
 		return "menu"
@@ -22,9 +27,13 @@ func commandInputValidation(input string) (appState string) {
 	return ""
 }
 
-func randomPick(vocabulary map[string]string, keys []string) (key string, value string) {
-	keyIndex := rand.Int() % len(keys)
-	return keys[keyIndex], vocabulary[keys[keyIndex]]
+func randomPick(vocabulary []Card) (key string, value string) {
+	if len(vocabulary) == 0 {
+		return "", ""
+	}
+
+	keyIndex := rand.Int() % len(vocabulary)
+	return vocabulary[keyIndex].Key, vocabulary[keyIndex].Value
 }
 
 func main() {
@@ -43,8 +52,7 @@ func main() {
 	}
 
 	// Initialize in-app vocabulary struct
-	vocabulary := make(map[string]string)
-	var keys []string
+	var vocabulary []Card
 
 	// Open the existing data file & populate vocabulary with current data
 	dataFile, err := os.OpenFile(dataFilePath, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
@@ -64,8 +72,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		vocabulary[dataLine[0]] = dataLine[1]
-		keys = append(keys, dataLine[0])
+		vocabulary = append(vocabulary, Card{Key: dataLine[0], Value: dataLine[1]})
     }
 	
 	// Open Menu & Query user for input
@@ -95,27 +102,25 @@ func main() {
 			}
 			
 			// Update the vocabulary, store to persistent file, and print info to the user
-			vocabulary[key] = value
-			keys = append(keys, key)
+			vocabulary = append(vocabulary, Card{Key: key, Value: value})
 
-			writtenLen, err := io.WriteString(dataWriter, fmt.Sprintf("%s,%s\n", key, value))
+			_, err := io.WriteString(dataWriter, fmt.Sprintf("%s,%s\n", key, value))
 			if err != nil {
 				fmt.Println(err)
 				os.Exit(1)
 			}
-			fmt.Println("written this lin:", writtenLen)
 			dataWriter.Flush()
 
 			pterm.Success.Printfln(fmt.Sprintf("Stored %s : %s", key, value))
 			pterm.Info.Printfln("Input /menu to go to menu, /quit to quit the program.\n\n")
 		} else if appState == "test" {
-			if len(vocabulary) == 0 || len(keys) == 0 {
+			if len(vocabulary) == 0 {
 				pterm.Warning.Printfln("No record on the data, cannot test yet. Please record some data first")
 				appState = "record"
 				continue
 			}
 			
-			testedKey, testedValue := randomPick(vocabulary, keys)
+			testedKey, testedValue := randomPick(vocabulary)
 
 			guessedValue, _ := pterm.DefaultInteractiveTextInput.WithDefaultText(testedKey).Show()
 			updatedState := commandInputValidation(guessedValue)
